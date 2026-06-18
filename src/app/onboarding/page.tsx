@@ -28,16 +28,34 @@ export default function OnboardingPage() {
         return;
       }
 
-      const { data: userProfile, error: profileError } = await supabase
+      let { data: userProfile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
 
+      // If no profile exists yet (e.g. first Google OAuth sign-in), create one
       if (profileError || !userProfile) {
-        setErrorMsg('Error loading profile. Please try logging in again.');
-        setFetchingProfile(false);
-        return;
+        const meta = user.user_metadata || {};
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            first_name: meta.given_name || meta.full_name?.split(' ')[0] || '',
+            last_name: meta.family_name || meta.full_name?.split(' ').slice(1).join(' ') || '',
+            email: user.email,
+            role: 'student',
+            status: 'pending',
+          })
+          .select()
+          .single();
+
+        if (createError || !newProfile) {
+          setErrorMsg('Error setting up your profile. Please try logging in again.');
+          setFetchingProfile(false);
+          return;
+        }
+        userProfile = newProfile;
       }
 
       setProfile(userProfile as Profile);
@@ -202,14 +220,13 @@ export default function OnboardingPage() {
               <div style={styles.inputRow}>
                 <input
                   type="text"
-                  required
                   placeholder="e.g. LINCOLN01"
                   className="input-field"
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
                   disabled={loading}
                 />
-                <button type="submit" disabled={loading} className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>
+                <button type="submit" disabled={loading || !inviteCode.trim()} className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>
                   Join School
                 </button>
               </div>
