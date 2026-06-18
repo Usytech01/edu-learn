@@ -3,88 +3,49 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Institution, Profile } from '@/types';
+
+type Role = 'student' | 'teacher';
 
 export default function OnboardingPage() {
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [inviteCode, setInviteCode] = useState('');
-  const [institutions, setInstitutions] = useState<Institution[]>([]);
-  const [selectedInst, setSelectedInst] = useState('');
+  const [userName, setUserName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [loading, setLoading] = useState(false);
-  const [fetchingProfile, setFetchingProfile] = useState(true);
+  const [fetchingUser, setFetchingUser] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-  const [requestSent, setRequestSent] = useState(false);
+  const [userId, setUserId] = useState('');
 
   const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
     const init = async () => {
-      // Fetch user profile
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/login');
         return;
       }
 
-      let { data: userProfile, error: profileError } = await supabase
+      setUserId(user.id);
+
+      // Check if profile already exists and is active
+      const { data: existingProfile } = await supabase
         .from('profiles')
-        .select('*')
+        .select('role, status, first_name')
         .eq('id', user.id)
         .single();
 
-      // If no profile exists yet (e.g. first Google OAuth sign-in), create one
-      if (profileError || !userProfile) {
-        const meta = user.user_metadata || {};
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            first_name: meta.given_name || meta.full_name?.split(' ')[0] || '',
-            last_name: meta.family_name || meta.full_name?.split(' ').slice(1).join(' ') || '',
-            email: user.email,
-            role: 'student',
-            status: 'pending',
-          })
-          .select()
-          .single();
-
-        if (createError || !newProfile) {
-          setErrorMsg('Error setting up your profile. Please try logging in again.');
-          setFetchingProfile(false);
-          return;
-        }
-        userProfile = newProfile;
-      }
-
-      setProfile(userProfile as Profile);
-      setFetchingProfile(false);
-
-      // If active, redirect straight to their dashboard
-      if (userProfile.status === 'active' && userProfile.institution_id) {
-        redirectToDashboard(userProfile.role);
+      if (existingProfile?.status === 'active') {
+        redirectToDashboard(existingProfile.role);
         return;
       }
 
-      // Fetch list of institutions for requesting access
-      const { data: instData } = await supabase
-        .from('institutions')
-        .select('*');
-      if (instData) {
-        setInstitutions(instData as Institution[]);
-      }
-
-      // Check if they already have an active request
-      const { data: requestData } = await supabase
-        .from('institution_access_requests')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'pending');
-      
-      if (requestData && requestData.length > 0) {
-        setRequestSent(true);
-      }
+      // Extract name from Google metadata
+      const meta = user.user_metadata || {};
+      const firstName = meta.given_name || meta.full_name?.split(' ')[0] || meta.name?.split(' ')[0] || 'there';
+      setUserName(firstName);
+      setAvatarUrl(meta.avatar_url || meta.picture || '');
+      setFetchingUser(false);
     };
 
     init();
@@ -100,174 +61,111 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleUseCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!profile) return;
+  const handleConfirm = async () => {
+    if (!selectedRole || !userId) return;
     setLoading(true);
     setErrorMsg('');
-    setSuccessMsg('');
 
     try {
-      const { data, error: rpcError } = await supabase.rpc('validate_invite_code', {
-        code: inviteCode.trim().toUpperCase(),
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
 
-      if (rpcError) throw rpcError;
+      const meta = user.user_metadata || {};
 
-      const validated = data as { institution_id: string; institution_name: string }[];
-      if (validated && validated.length > 0) {
-        const instId = validated[0].institution_id;
+      // Upsert profile with role and active status
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          first_name: meta.given_name || meta.full_name?.split(' ')[0] || '',
+          last_name: meta.family_name || meta.full_name?.split(' ').slice(1).join(' ') || '',
+          email: user.email,
+          role: selectedRole,
+          status: 'active',
+        }, { onConflict: 'id' });
 
-        // Update profile in database
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            institution_id: instId,
-            status: 'active',
-          })
-          .eq('id', profile.id);
+      if (error) throw error;
 
-        if (updateError) throw updateError;
-
-        setSuccessMsg(`Successfully joined ${validated[0].institution_name}! Redirecting...`);
-        setTimeout(() => {
-          redirectToDashboard(profile.role);
-        }, 2000);
-      } else {
-        throw new Error('Invalid invite code.');
-      }
+      redirectToDashboard(selectedRole);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to apply invite code.');
+      setErrorMsg(err.message || 'Something went wrong. Please try again.');
       setLoading(false);
     }
   };
 
-  const handleRequestAccess = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!profile || !selectedInst) return;
-    setLoading(true);
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    try {
-      const { error: requestError } = await supabase
-        .from('institution_access_requests')
-        .insert({
-          user_id: profile.id,
-          institution_id: selectedInst,
-          status: 'pending',
-        });
-
-      if (requestError) throw requestError;
-
-      setRequestSent(true);
-      setSuccessMsg('Your access request has been sent to the school administrator. You will be able to access the dashboard once approved.');
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to submit request.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (fetchingProfile) {
+  if (fetchingUser) {
     return (
       <div style={styles.container}>
-        <div style={styles.loadingBox}>Loading your profile...</div>
+        <div style={styles.loadingBox}>
+          <div style={styles.spinner} />
+          <p style={{ color: '#64748b', marginTop: '12px' }}>Loading your profile...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div style={styles.container}>
-      <div style={styles.card} className="glass">
-        <h1 style={styles.title}>Finish Setting Up</h1>
-        <p style={styles.subtitle}>Welcome, {profile?.first_name}! You need to connect to an institution before you can access the portal.</p>
+      <div style={styles.card}>
+        {/* Header */}
+        <div style={styles.header}>
+          {avatarUrl && (
+            <img src={avatarUrl} alt="Profile" style={styles.avatar} />
+          )}
+          <h1 style={styles.title}>Welcome, {userName}! 👋</h1>
+          <p style={styles.subtitle}>One last step — tell us how you'll be using Edu-Learn.</p>
+        </div>
 
         {errorMsg && <div style={styles.error}>{errorMsg}</div>}
-        {successMsg && <div style={styles.success}>{successMsg}</div>}
 
-        {requestSent ? (
-          <div style={styles.pendingContainer}>
-            <div style={styles.pendingBadge}>Pending Approval</div>
-            <p style={styles.pendingText}>
-              Your request for access is currently pending administrator approval. Please contact your school administrator or check back later.
-            </p>
-            <button
-              onClick={async () => {
-                const { data: updatedProfile } = await supabase
-                  .from('profiles')
-                  .select('status, role')
-                  .eq('id', profile!.id)
-                  .single();
-                if (updatedProfile?.status === 'active') {
-                  redirectToDashboard(updatedProfile.role);
-                } else {
-                  alert('Your account is still pending approval.');
-                }
-              }}
-              className="btn btn-secondary"
-              style={{ marginTop: '10px' }}
-            >
-              Refresh Status
-            </button>
-          </div>
-        ) : (
-          <div>
-            {/* Option A: Enter Invite Code */}
-            <form onSubmit={handleUseCode} style={styles.formSection}>
-              <h3 style={styles.sectionTitle}>Option 1: Enter Invite Code</h3>
-              <p style={styles.sectionDesc}>If your school gave you a join code, enter it below to get instant access.</p>
-              <div style={styles.inputRow}>
-                <input
-                  type="text"
-                  placeholder="e.g. LINCOLN01"
-                  className="input-field"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  disabled={loading}
-                />
-                <button type="submit" disabled={loading || !inviteCode.trim()} className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>
-                  Join School
-                </button>
-              </div>
-            </form>
+        {/* Role Selection */}
+        <p style={styles.roleLabel}>I am a...</p>
+        <div style={styles.roleGrid}>
+          <button
+            type="button"
+            onClick={() => setSelectedRole('student')}
+            style={{
+              ...styles.roleCard,
+              ...(selectedRole === 'student' ? styles.roleCardActive : {}),
+            }}
+          >
+            <span style={styles.roleIcon}>🎓</span>
+            <span style={styles.roleName}>Student</span>
+            <span style={styles.roleDesc}>I want to learn and access course materials</span>
+            {selectedRole === 'student' && <span style={styles.checkBadge}>✓</span>}
+          </button>
 
-            <div style={styles.divider}>
-              <span>OR</span>
-            </div>
+          <button
+            type="button"
+            onClick={() => setSelectedRole('teacher')}
+            style={{
+              ...styles.roleCard,
+              ...(selectedRole === 'teacher' ? styles.roleCardActive : {}),
+            }}
+          >
+            <span style={styles.roleIcon}>📚</span>
+            <span style={styles.roleName}>Teacher</span>
+            <span style={styles.roleDesc}>I want to create and manage courses</span>
+            {selectedRole === 'teacher' && <span style={styles.checkBadge}>✓</span>}
+          </button>
+        </div>
 
-            {/* Option B: Request Access (For Teachers) */}
-            <form onSubmit={handleRequestAccess} style={styles.formSection}>
-              <h3 style={styles.sectionTitle}>Option 2: Request Access</h3>
-              <p style={styles.sectionDesc}>Select your school from the list to request approval from the administrator.</p>
-              <div style={styles.inputGroup}>
-                <select
-                  required
-                  className="input-field"
-                  value={selectedInst}
-                  onChange={(e) => setSelectedInst(e.target.value)}
-                  disabled={loading || institutions.length === 0}
-                  style={{ height: '46px' }}
-                >
-                  <option value="">-- Select your school --</option>
-                  {institutions.map((inst) => (
-                    <option key={inst.id} value={inst.id}>
-                      {inst.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                type="submit"
-                disabled={loading || !selectedInst}
-                className="btn btn-secondary"
-                style={{ width: '100%', marginTop: '12px' }}
-              >
-                Request Access
-              </button>
-            </form>
-          </div>
-        )}
+        {/* Confirm Button */}
+        <button
+          type="button"
+          onClick={handleConfirm}
+          disabled={!selectedRole || loading}
+          style={{
+            ...styles.confirmBtn,
+            ...(!selectedRole || loading ? styles.confirmBtnDisabled : {}),
+          }}
+        >
+          {loading ? 'Setting up your account...' : `Continue as ${selectedRole ? selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1) : '...'}`}
+        </button>
+
+        <p style={styles.note}>
+          Your Google account details will be used to set up your profile automatically.
+        </p>
       </div>
     </div>
   );
@@ -283,67 +181,137 @@ const styles: { [key: string]: React.CSSProperties } = {
     background: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
   },
   loadingBox: {
-    padding: '20px 40px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '40px',
     backgroundColor: '#fff',
-    borderRadius: '8px',
-    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-    fontWeight: '500',
+    borderRadius: '16px',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+  },
+  spinner: {
+    width: '36px',
+    height: '36px',
+    border: '3px solid #e2e8f0',
+    borderTop: '3px solid #4f46e5',
+    borderRadius: '50%',
+    animation: 'spin 0.8s linear infinite',
   },
   card: {
     width: '100%',
-    maxWidth: '500px',
+    maxWidth: '480px',
     padding: '40px',
-    borderRadius: '16px',
-    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: '20px',
+    backgroundColor: 'rgba(255,255,255,0.97)',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
     color: '#1e293b',
   },
-  title: {
-    fontSize: '2rem',
-    fontWeight: '800',
+  header: {
     textAlign: 'center',
+    marginBottom: '32px',
+  },
+  avatar: {
+    width: '72px',
+    height: '72px',
+    borderRadius: '50%',
+    border: '3px solid #e2e8f0',
+    marginBottom: '16px',
+    objectFit: 'cover',
+  },
+  title: {
+    fontSize: '1.8rem',
+    fontWeight: '800',
+    color: '#0f172a',
     marginBottom: '8px',
-    color: '#1e293b',
   },
   subtitle: {
     fontSize: '0.95rem',
     color: '#64748b',
-    textAlign: 'center',
-    marginBottom: '30px',
+    lineHeight: '1.5',
   },
-  formSection: {
+  roleLabel: {
+    fontSize: '0.9rem',
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: '14px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  roleGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '14px',
+    marginBottom: '28px',
+  },
+  roleCard: {
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '24px 16px',
+    borderRadius: '14px',
+    border: '2px solid #e2e8f0',
     backgroundColor: '#f8fafc',
-    padding: '20px',
-    borderRadius: '12px',
-    border: '1px solid #e2e8f0',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    textAlign: 'center',
+    gap: '8px',
   },
-  sectionTitle: {
+  roleCardActive: {
+    border: '2px solid #4f46e5',
+    backgroundColor: '#eef2ff',
+    boxShadow: '0 4px 14px rgba(79,70,229,0.2)',
+  },
+  roleIcon: {
+    fontSize: '2.2rem',
+  },
+  roleName: {
     fontSize: '1rem',
     fontWeight: '700',
     color: '#0f172a',
-    marginBottom: '6px',
   },
-  sectionDesc: {
-    fontSize: '0.85rem',
+  roleDesc: {
+    fontSize: '0.78rem',
     color: '#64748b',
-    marginBottom: '12px',
+    lineHeight: '1.4',
   },
-  inputRow: {
+  checkBadge: {
+    position: 'absolute',
+    top: '10px',
+    right: '12px',
+    width: '22px',
+    height: '22px',
+    borderRadius: '50%',
+    backgroundColor: '#4f46e5',
+    color: '#fff',
+    fontSize: '0.75rem',
     display: 'flex',
-    gap: '10px',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: '700',
   },
-  inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
+  confirmBtn: {
+    width: '100%',
+    padding: '14px',
+    borderRadius: '12px',
+    border: 'none',
+    backgroundColor: '#4f46e5',
+    color: '#fff',
+    fontSize: '1rem',
+    fontWeight: '700',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    marginBottom: '16px',
   },
-  divider: {
-    textAlign: 'center',
-    margin: '20px 0',
-    position: 'relative',
+  confirmBtnDisabled: {
+    backgroundColor: '#c7d2fe',
+    cursor: 'not-allowed',
+  },
+  note: {
+    fontSize: '0.8rem',
     color: '#94a3b8',
-    fontSize: '0.85rem',
-    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: '1.5',
   },
   error: {
     padding: '12px',
@@ -352,33 +320,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: '#b91c1c',
     fontSize: '0.85rem',
     marginBottom: '20px',
-  },
-  success: {
-    padding: '12px',
-    borderRadius: '8px',
-    backgroundColor: '#d1fae5',
-    color: '#065f46',
-    fontSize: '0.85rem',
-    marginBottom: '20px',
-  },
-  pendingContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    textAlign: 'center',
-    gap: '15px',
-  },
-  pendingBadge: {
-    padding: '6px 16px',
-    borderRadius: '20px',
-    backgroundColor: '#fef3c7',
-    color: '#d97706',
-    fontWeight: '600',
-    fontSize: '0.85rem',
-  },
-  pendingText: {
-    fontSize: '0.95rem',
-    color: '#475569',
-    lineHeight: '1.5',
+    border: '1px solid #fecaca',
   },
 };

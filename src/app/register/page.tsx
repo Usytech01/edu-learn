@@ -11,7 +11,6 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'student' | 'teacher'>('student');
-  const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -43,29 +42,6 @@ export default function RegisterPage() {
     setSuccessMsg('');
 
     try {
-      let institutionId: string | null = null;
-      let institutionName = '';
-
-      // Validate invite code if provided
-      if (inviteCode.trim() !== '') {
-        const { data, error: rpcError } = await supabase.rpc('validate_invite_code', {
-          code: inviteCode.trim().toUpperCase(),
-        });
-
-        if (rpcError) {
-          throw new Error('Failed to validate invite code: ' + rpcError.message);
-        }
-
-        // The RPC returns a setof record / table: [{ institution_id: '...', institution_name: '...' }]
-        const validated = data as { institution_id: string; institution_name: string }[];
-        if (validated && validated.length > 0) {
-          institutionId = validated[0].institution_id;
-          institutionName = validated[0].institution_name;
-        } else {
-          throw new Error('Invalid invite code. Please check with your school administrator.');
-        }
-      }
-
       // Register user through Supabase Auth
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -75,9 +51,8 @@ export default function RegisterPage() {
             first_name: firstName,
             last_name: lastName,
             role: role,
-            institution_id: institutionId || '',
           },
-          emailRedirectTo: `${window.location.origin}/login`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
@@ -86,7 +61,7 @@ export default function RegisterPage() {
       }
 
       if (data.user) {
-        setSuccessMsg('Registration successful! Please check your email to verify your account, or sign in if email verification is bypassed.');
+        setSuccessMsg('Registration successful! Please check your email to verify your account.');
         setTimeout(() => {
           router.push('/login');
         }, 3000);
@@ -210,19 +185,6 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>
-              School Invite Code <span style={{ fontWeight: 'normal', color: '#94a3b8' }}>(Optional)</span>
-            </label>
-            <input
-              type="text"
-              className="input-field"
-              value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value)}
-              placeholder="e.g. LINCOLN01"
-              disabled={loading}
-            />
-          </div>
 
           <button type="submit" disabled={loading} style={styles.button} className="btn btn-primary">
             {loading ? 'Registering...' : 'Register'}
