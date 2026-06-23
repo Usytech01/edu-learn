@@ -6,11 +6,6 @@ import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 
 export default function RegisterPage() {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'student' | 'teacher' | 'school_admin'>('student');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -31,43 +26,6 @@ export default function RegisterPage() {
       if (error) throw error;
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to sign up with Google.');
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    try {
-      // Register user through Supabase Auth
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-            role: role,
-          },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (signUpError) {
-        throw signUpError;
-      }
-
-      if (data.user) {
-        setSuccessMsg('Registration successful! Please check your email to verify your account.');
-        setTimeout(() => {
-          router.push('/login');
-        }, 3000);
-      }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'An error occurred during registration.');
       setLoading(false);
     }
   };
@@ -96,99 +54,6 @@ export default function RegisterPage() {
           </svg>
           Continue with Google
         </button>
-
-        <div style={styles.divider}>
-          <span style={styles.dividerLine} />
-          <span style={styles.dividerText}>or register with email</span>
-          <span style={styles.dividerLine} />
-        </div>
-
-        <form onSubmit={handleRegister} style={styles.form}>
-          <div style={styles.row}>
-            <div style={{ ...styles.inputGroup, flex: 1 }}>
-              <label style={styles.label}>First Name</label>
-              <input
-                type="text"
-                required
-                className="input-field"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder="John"
-                disabled={loading}
-              />
-            </div>
-            <div style={{ ...styles.inputGroup, flex: 1 }}>
-              <label style={styles.label}>Last Name</label>
-              <input
-                type="text"
-                required
-                className="input-field"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                placeholder="Doe"
-                disabled={loading}
-              />
-            </div>
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>I am a...</label>
-            <div style={styles.roleGrid}>
-              {[
-                { value: 'student', label: 'Student', icon: '🎓', desc: 'I want to learn and track my progress' },
-                { value: 'teacher', label: 'Teacher', icon: '📚', desc: 'I want to create and manage courses' },
-                { value: 'school_admin', label: 'School Admin', icon: '🏫', desc: 'I manage users and institution settings' },
-              ].map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
-                  disabled={loading}
-                  onClick={() => setRole(r.value as any)}
-                  style={{
-                    ...styles.roleCard,
-                    ...(role === r.value ? styles.roleCardActive : {}),
-                  }}
-                >
-                  <span style={styles.roleIcon}>{r.icon}</span>
-                  <span style={styles.roleName}>{r.label}</span>
-                  <span style={styles.roleDesc}>{r.desc}</span>
-                  {role === r.value && <span style={styles.checkBadge}>✓</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Email Address</label>
-            <input
-              type="email"
-              required
-              className="input-field"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@school.edu"
-              disabled={loading}
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Password</label>
-            <input
-              type="password"
-              required
-              className="input-field"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 6 characters"
-              disabled={loading}
-            />
-          </div>
-
-
-          <button type="submit" disabled={loading} style={styles.button} className="btn btn-primary">
-            {loading ? 'Registering...' : 'Register'}
-          </button>
-        </form>
 
         <p style={styles.footerText}>
           Already have an account? <Link href="/login" style={styles.link}>Sign In</Link>
