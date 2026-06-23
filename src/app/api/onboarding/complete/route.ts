@@ -20,14 +20,34 @@ export async function POST(request: NextRequest) {
 
     const meta = user.user_metadata || {};
 
+    // Resolve name from Google OAuth metadata — must be non-empty (DB CHECK constraint)
+    const rawFirst =
+      meta.given_name ||
+      meta.first_name ||
+      meta.full_name?.split(' ')[0] ||
+      meta.name?.split(' ')[0] ||
+      user.email?.split('@')[0] ||
+      'User';
+
+    const rawLast =
+      meta.family_name ||
+      meta.last_name ||
+      meta.full_name?.split(' ').slice(1).join(' ') ||
+      meta.name?.split(' ').slice(1).join(' ') ||
+      '';
+
+    // Trim and ensure first_name is never empty (satisfies CHECK constraint)
+    const firstName = rawFirst.trim() || 'User';
+    const lastName = rawLast.trim();
+
     // Use service role client to bypass RLS for profile creation
     const adminClient = createServiceClient();
     const { error } = await adminClient
       .from('profiles')
       .upsert({
         id: user.id,
-        first_name: meta.given_name || meta.full_name?.split(' ')[0] || '',
-        last_name: meta.family_name || meta.full_name?.split(' ').slice(1).join(' ') || '',
+        first_name: firstName,
+        last_name: lastName,
         email: user.email,
         role,
         status: 'active',
