@@ -86,9 +86,9 @@ export default function RegisterPage() {
         {errorMsg && <div style={styles.error}>{errorMsg}</div>}
         {successMsg && <div style={styles.success}>{successMsg}</div>}
 
-        {/* Step 1: Role Selection */}
+        {/* Role Selection */}
         <div style={styles.inputGroup}>
-          <label style={styles.label}>Step 1 — I am a...</label>
+          <label style={styles.label}>I am a...</label>
           <div style={styles.roleGrid}>
             {[
               { value: 'student', label: 'Student', icon: '🎓', desc: 'I want to learn and track my progress' },
@@ -114,9 +114,8 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* Step 2: Google Sign-Up (primary) */}
+        {/* Google Sign-Up */}
         <div style={styles.googleSection}>
-          <label style={styles.label}>Step 2 — Create your account</label>
           <button
             type="button"
             onClick={handleGoogleSignUp}
@@ -175,33 +174,6 @@ export default function RegisterPage() {
                 placeholder="Doe"
                 disabled={loading}
               />
-            </div>
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>I am a...</label>
-            <div style={styles.roleGrid}>
-              {[
-                { value: 'student', label: 'Student', icon: '🎓', desc: 'I want to learn and track my progress' },
-                { value: 'teacher', label: 'Teacher', icon: '📚', desc: 'I want to create and manage courses' },
-                { value: 'school_admin', label: 'School Admin', icon: '🏫', desc: 'I manage users and institution settings' },
-              ].map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
-                  disabled={loading}
-                  onClick={() => setRole(r.value as any)}
-                  style={{
-                    ...styles.roleCard,
-                    ...(role === r.value ? styles.roleCardActive : {}),
-                  }}
-                >
-                  <span style={styles.roleIcon}>{r.icon}</span>
-                  <span style={styles.roleName}>{r.label}</span>
-                  <span style={styles.roleDesc}>{r.desc}</span>
-                  {role === r.value && <span style={styles.checkBadge}>✓</span>}
-                </button>
-              ))}
             </div>
           </div>
 
