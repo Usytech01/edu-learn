@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { role } = body;
 
-    if (!role || !['student', 'teacher'].includes(role)) {
+    if (!role || !['student', 'teacher', 'school_admin'].includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
 

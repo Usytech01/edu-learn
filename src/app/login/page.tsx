@@ -119,6 +119,11 @@ export default function LoginPage() {
               Sign in with Google
             </button>
           </div>
+          <div style={styles.divider}>
+            <span style={styles.dividerLine} />
+            <span style={styles.dividerText}>or sign in with email</span>
+            <span style={styles.dividerLine} />
+          </div>
           <form onSubmit={handleLogin} style={styles.form}>
           <div style={styles.inputGroup}>
             <label style={styles.label}>Email Address</label>
@@ -152,7 +157,7 @@ export default function LoginPage() {
         </form>
 
         <p style={styles.footerText}>
-          Don't have an account? <Link href="/register" style={styles.link}>Register here</Link>
+          Don't have an account? <Link href="/register" style={styles.link}>Sign Up</Link>
         </p>
       </div>
     </div>
@@ -255,5 +260,23 @@ const styles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     transition: 'all var(--transition-fast)',
     boxShadow: 'var(--shadow-sm)',
+  },
+  divider: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    margin: '20px 0 4px',
+  },
+  dividerLine: {
+    flex: 1,
+    height: '1px',
+    backgroundColor: '#e2e8f0',
+    display: 'block',
+  },
+  dividerText: {
+    fontSize: '0.8rem',
+    color: '#94a3b8',
+    fontWeight: '500',
+    whiteSpace: 'nowrap',
   },
 };

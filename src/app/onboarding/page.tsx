@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-type Role = 'student' | 'teacher';
+type Role = 'student' | 'teacher' | 'school_admin';
 
 export default function OnboardingPage() {
   const [userName, setUserName] = useState('');
@@ -56,8 +56,10 @@ export default function OnboardingPage() {
       router.push('/dashboard/teacher');
     } else if (role === 'student') {
       router.push('/dashboard/student');
-    } else {
+    } else if (role === 'school_admin') {
       router.push('/dashboard/admin');
+    } else {
+      router.push('/dashboard/student');
     }
   };
 
@@ -138,6 +140,20 @@ export default function OnboardingPage() {
             <span style={styles.roleName}>Teacher</span>
             <span style={styles.roleDesc}>I want to create and manage courses</span>
             {selectedRole === 'teacher' && <span style={styles.checkBadge}>✓</span>}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedRole('school_admin')}
+            style={{
+              ...styles.roleCard,
+              ...(selectedRole === 'school_admin' ? styles.roleCardActive : {}),
+            }}
+          >
+            <span style={styles.roleIcon}>🏫</span>
+            <span style={styles.roleName}>School Admin</span>
+            <span style={styles.roleDesc}>I manage users and institution settings</span>
+            {selectedRole === 'school_admin' && <span style={styles.checkBadge}>✓</span>}
           </button>
         </div>
 
@@ -230,7 +246,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   roleGrid: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    gridTemplateColumns: 'repeat(3, 1fr)',
     gap: '14px',
     marginBottom: '28px',
   },

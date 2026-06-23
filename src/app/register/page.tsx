@@ -10,7 +10,7 @@ export default function RegisterPage() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'student' | 'teacher'>('student');
+  const [role, setRole] = useState<'student' | 'teacher' | 'school_admin'>('student');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -132,30 +132,29 @@ export default function RegisterPage() {
           </div>
 
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Role</label>
-            <div style={styles.radioGroup}>
-              <label style={styles.radioLabel}>
-                <input
-                  type="radio"
-                  name="role"
-                  value="student"
-                  checked={role === 'student'}
-                  onChange={() => setRole('student')}
+            <label style={styles.label}>I am a...</label>
+            <div style={styles.roleGrid}>
+              {[
+                { value: 'student', label: 'Student', icon: '🎓', desc: 'I want to learn and track my progress' },
+                { value: 'teacher', label: 'Teacher', icon: '📚', desc: 'I want to create and manage courses' },
+                { value: 'school_admin', label: 'School Admin', icon: '🏫', desc: 'I manage users and institution settings' },
+              ].map((r) => (
+                <button
+                  key={r.value}
+                  type="button"
                   disabled={loading}
-                />
-                Student
-              </label>
-              <label style={styles.radioLabel}>
-                <input
-                  type="radio"
-                  name="role"
-                  value="teacher"
-                  checked={role === 'teacher'}
-                  onChange={() => setRole('teacher')}
-                  disabled={loading}
-                />
-                Teacher
-              </label>
+                  onClick={() => setRole(r.value as any)}
+                  style={{
+                    ...styles.roleCard,
+                    ...(role === r.value ? styles.roleCardActive : {}),
+                  }}
+                >
+                  <span style={styles.roleIcon}>{r.icon}</span>
+                  <span style={styles.roleName}>{r.label}</span>
+                  <span style={styles.roleDesc}>{r.desc}</span>
+                  {role === r.value && <span style={styles.checkBadge}>✓</span>}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -194,6 +193,9 @@ export default function RegisterPage() {
         <p style={styles.footerText}>
           Already have an account? <Link href="/login" style={styles.link}>Sign In</Link>
         </p>
+        <p style={{ ...styles.footerText, marginTop: '8px' }}>
+          By signing up, you agree to our terms of service and privacy policy.
+        </p>
       </div>
     </div>
   );
@@ -210,7 +212,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   card: {
     width: '100%',
-    maxWidth: '460px',
+    maxWidth: '520px',
     padding: '40px',
     borderRadius: '16px',
     boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
@@ -251,18 +253,58 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontWeight: '600',
     color: '#475569',
   },
-  radioGroup: {
-    display: 'flex',
-    gap: '20px',
-    marginTop: '4px',
+  roleGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: '10px',
+    marginTop: '6px',
   },
-  radioLabel: {
+  roleCard: {
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '16px 10px',
+    borderRadius: '12px',
+    border: '2px solid #e2e8f0',
+    backgroundColor: '#f8fafc',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    textAlign: 'center',
+    gap: '5px',
+  },
+  roleCardActive: {
+    border: '2px solid #4f46e5',
+    backgroundColor: '#eef2ff',
+    boxShadow: '0 4px 14px rgba(79,70,229,0.15)',
+  },
+  roleIcon: {
+    fontSize: '1.8rem',
+  },
+  roleName: {
+    fontSize: '0.88rem',
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  roleDesc: {
+    fontSize: '0.72rem',
+    color: '#64748b',
+    lineHeight: '1.3',
+  },
+  checkBadge: {
+    position: 'absolute' as const,
+    top: '8px',
+    right: '8px',
+    width: '18px',
+    height: '18px',
+    borderRadius: '50%',
+    backgroundColor: '#4f46e5',
+    color: '#fff',
+    fontSize: '0.65rem',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    fontSize: '0.95rem',
-    cursor: 'pointer',
-    color: '#334155',
+    justifyContent: 'center',
+    fontWeight: '700',
   },
   button: {
     width: '100%',
