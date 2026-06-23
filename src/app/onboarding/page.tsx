@@ -67,24 +67,15 @@ export default function OnboardingPage() {
     setErrorMsg('');
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      // Call server-side API route which uses the service role key to bypass RLS
+      const res = await fetch('/api/onboarding/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: selectedRole }),
+      });
 
-      const meta = user.user_metadata || {};
-
-      // Upsert profile with role and active status
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          first_name: meta.given_name || meta.full_name?.split(' ')[0] || '',
-          last_name: meta.family_name || meta.full_name?.split(' ').slice(1).join(' ') || '',
-          email: user.email,
-          role: selectedRole,
-          status: 'active',
-        }, { onConflict: 'id' });
-
-      if (error) throw error;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong.');
 
       redirectToDashboard(selectedRole);
     } catch (err: any) {
