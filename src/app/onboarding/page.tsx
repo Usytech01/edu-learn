@@ -45,6 +45,32 @@ export default function OnboardingPage() {
       const firstName = meta.given_name || meta.full_name?.split(' ')[0] || meta.name?.split(' ')[0] || 'there';
       setUserName(firstName);
       setAvatarUrl(meta.avatar_url || meta.picture || '');
+
+      // Check if role is present in search parameters for auto-submission
+      const searchParams = new URLSearchParams(window.location.search);
+      const roleParam = searchParams.get('role');
+      const validRoles: Role[] = ['student', 'teacher', 'school_admin'];
+      if (roleParam && validRoles.includes(roleParam as Role)) {
+        setSelectedRole(roleParam as Role);
+        setLoading(true);
+        try {
+          const res = await fetch('/api/onboarding/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: roleParam }),
+          });
+
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+
+          redirectToDashboard(roleParam);
+          return;
+        } catch (err: any) {
+          setErrorMsg(err.message || 'Something went wrong. Please select your role manually.');
+          setLoading(false);
+        }
+      }
+
       setFetchingUser(false);
     };
 
