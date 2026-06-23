@@ -19,18 +19,13 @@ export default function RegisterPage() {
   const supabase = createClient();
 
   const handleGoogleSignUp = async () => {
-    if (!role) {
-      setErrorMsg('Please select your role first before continuing with Google.');
-      return;
-    }
     setLoading(true);
     setErrorMsg('');
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // Pass the selected role as a query param so the callback can forward it to onboarding
-          redirectTo: `${window.location.origin}/auth/callback?role=${role}`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       if (error) throw error;
@@ -86,63 +81,21 @@ export default function RegisterPage() {
         {errorMsg && <div style={styles.error}>{errorMsg}</div>}
         {successMsg && <div style={styles.success}>{successMsg}</div>}
 
-        {/* Step 1: Role Selection */}
-        <div style={styles.inputGroup}>
-          <label style={styles.label}>Step 1 — I am a...</label>
-          <div style={styles.roleGrid}>
-            {[
-              { value: 'student', label: 'Student', icon: '🎓', desc: 'I want to learn and track my progress' },
-              { value: 'teacher', label: 'Teacher', icon: '📚', desc: 'I want to create and manage courses' },
-              { value: 'school_admin', label: 'School Admin', icon: '🏫', desc: 'I manage users and institution settings' },
-            ].map((r) => (
-              <button
-                key={r.value}
-                type="button"
-                disabled={loading}
-                onClick={() => setRole(r.value as any)}
-                style={{
-                  ...styles.roleCard,
-                  ...(role === r.value ? styles.roleCardActive : {}),
-                }}
-              >
-                <span style={styles.roleIcon}>{r.icon}</span>
-                <span style={styles.roleName}>{r.label}</span>
-                <span style={styles.roleDesc}>{r.desc}</span>
-                {role === r.value && <span style={styles.checkBadge}>✓</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Step 2: Google Sign-Up (primary) */}
-        <div style={styles.googleSection}>
-          <label style={styles.label}>Step 2 — Create your account</label>
-          <button
-            type="button"
-            onClick={handleGoogleSignUp}
-            disabled={loading || !role}
-            style={{
-              ...styles.googleBtn,
-              opacity: !role ? 0.5 : 1,
-              cursor: !role ? 'not-allowed' : 'pointer',
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" style={{ marginRight: '10px', flexShrink: 0 }}>
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-            </svg>
-            {loading
-              ? 'Redirecting to Google...'
-              : role
-              ? `Continue with Google as ${role === 'school_admin' ? 'School Admin' : role.charAt(0).toUpperCase() + role.slice(1)}`
-              : 'Continue with Google'}
-          </button>
-          {!role && (
-            <p style={styles.roleHint}>☝️ Select your role above first</p>
-          )}
-        </div>
+        {/* Google Sign-Up */}
+        <button
+          type="button"
+          onClick={handleGoogleSignUp}
+          disabled={loading}
+          style={styles.googleBtn}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" style={{ marginRight: '10px', flexShrink: 0 }}>
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+          </svg>
+          Continue with Google
+        </button>
 
         <div style={styles.divider}>
           <span style={styles.dividerLine} />
@@ -150,8 +103,8 @@ export default function RegisterPage() {
           <span style={styles.dividerLine} />
         </div>
 
-        <form onSubmit={handleRegister}>
-          <div style={{ display: 'flex', gap: '16px' }}>
+        <form onSubmit={handleRegister} style={styles.form}>
+          <div style={styles.row}>
             <div style={{ ...styles.inputGroup, flex: 1 }}>
               <label style={styles.label}>First Name</label>
               <input
